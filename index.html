@@ -3,173 +3,173 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Breakout RPG Base</title>
+  <title>Breakout RPG</title>
   <style>
-    * { box-sizing: border-box; }
-    body { margin: 0; background: #111; color: #fff; font-family: sans-serif; }
-    canvas { display: block; margin: 0 auto; background: #222; }
-    #hud {
-      text-align: center;
-      padding: 0.5rem;
-      background: #000;
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #111;
+      color: #fff;
       font-family: monospace;
+      overflow: hidden;
+    }
+    #stats {
+      position: fixed;
+      left: 1rem;
+      top: 1rem;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 1rem;
+      border: 2px solid #44cc44;
+      border-radius: 10px;
+    }
+    canvas {
+      display: block;
     }
   </style>
 </head>
 <body>
-  <div id="hud">
-    🧠 XP: <span id="xp">0</span> | 🎮 Level: <span id="level">1</span>
+  <div id="stats">
+    <div>🧠 XP: <span id="xp">0</span></div>
+    <div>💨 Speed: <span id="speed">1</span></div>
+    <div>💪 Strength: <span id="strength">1</span></div>
   </div>
-  <canvas id="gameCanvas" width="480" height="320"></canvas>
-
+  <canvas id="game"></canvas>
   <script>
-    const canvas = document.getElementById("gameCanvas");
+    const canvas = document.getElementById("game");
     const ctx = canvas.getContext("2d");
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const paddleWidth = 100;
+    const paddleHeight = 20;
+    let paddleX = canvas.width / 2 - paddleWidth / 2;
+    const paddleY = canvas.height - 40;
+    const paddleSpeed = 8;
 
     let xp = 0;
-    let level = 1;
-    const xpDisplay = document.getElementById("xp");
-    const levelDisplay = document.getElementById("level");
-
-    const paddle = {
-      width: 75,
-      height: 10,
-      x: canvas.width / 2 - 75 / 2,
-      y: canvas.height - 20,
-      dx: 4
+    const stats = {
+      speed: 1,
+      strength: 1,
     };
 
     const ball = {
       x: canvas.width / 2,
-      y: canvas.height - 30,
-      radius: 8,
-      dx: 2,
-      dy: -2
+      y: canvas.height - 60,
+      radius: 10,
+      vx: 2,
+      vy: -4,
+      launched: false
     };
 
-    const brick = {
-      rowCount: 3,
-      columnCount: 5,
-      width: 75,
-      height: 20,
-      padding: 10,
-      offsetTop: 30,
-      offsetLeft: 30
-    };
+    const colors = ["red", "orange", "yellow", "green", "blue"];
+    const blocks = [];
 
-    const bricks = [];
-    for (let c = 0; c < brick.columnCount; c++) {
-      bricks[c] = [];
-      for (let r = 0; r < brick.rowCount; r++) {
-        bricks[c][r] = { x: 0, y: 0, visible: true };
+    for (let row = 0; row < 5; row++) {
+      for (let col = 0; col < 10; col++) {
+        blocks.push({
+          x: 80 + col * 70,
+          y: 60 + row * 40,
+          width: 60,
+          height: 20,
+          color: colors[row],
+          xp: (row + 1) * 2,
+          hit: false
+        });
       }
     }
-
-    let rightPressed = false;
-    let leftPressed = false;
-
-    document.addEventListener("keydown", e => {
-      if (e.key === "Right" || e.key === "ArrowRight") rightPressed = true;
-      if (e.key === "Left" || e.key === "ArrowLeft") leftPressed = true;
-    });
-    document.addEventListener("keyup", e => {
-      if (e.key === "Right" || e.key === "ArrowRight") rightPressed = false;
-      if (e.key === "Left" || e.key === "ArrowLeft") leftPressed = false;
-    });
 
     function drawBall() {
+      const gradient = ctx.createRadialGradient(ball.x, ball.y, ball.radius / 3, ball.x, ball.y, ball.radius);
+      gradient.addColorStop(0, "#fff");
+      gradient.addColorStop(1, "#aaa");
+      ctx.fillStyle = gradient;
       ctx.beginPath();
       ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
-      ctx.fillStyle = "#ffee88";
       ctx.fill();
-      ctx.closePath();
-    }
-
-    function drawPaddle() {
-      ctx.beginPath();
-      ctx.rect(paddle.x, paddle.y, paddle.width, paddle.height);
-      ctx.fillStyle = "#ffee88";
-      ctx.fill();
-      ctx.closePath();
-    }
-
-    function drawBricks() {
-      for (let c = 0; c < brick.columnCount; c++) {
-        for (let r = 0; r < brick.rowCount; r++) {
-          if (bricks[c][r].visible) {
-            const brickX = c * (brick.width + brick.padding) + brick.offsetLeft;
-            const brickY = r * (brick.height + brick.padding) + brick.offsetTop;
-            bricks[c][r].x = brickX;
-            bricks[c][r].y = brickY;
-            ctx.beginPath();
-            ctx.rect(brickX, brickY, brick.width, brick.height);
-            ctx.fillStyle = "#ffaa00";
-            ctx.fill();
-            ctx.closePath();
-          }
-        }
-      }
-    }
-
-    function collisionDetection() {
-      for (let c = 0; c < brick.columnCount; c++) {
-        for (let r = 0; r < brick.rowCount; r++) {
-          const b = bricks[c][r];
-          if (b.visible) {
-            if (
-              ball.x > b.x &&
-              ball.x < b.x + brick.width &&
-              ball.y > b.y &&
-              ball.y < b.y + brick.height
-            ) {
-              ball.dy = -ball.dy;
-              b.visible = false;
-              xp += 10;
-              xpDisplay.textContent = xp;
-            }
-          }
-        }
-      }
     }
 
     function draw() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      drawBricks();
+
+      // Draw paddle
+      ctx.fillStyle = "#44cc44";
+      ctx.fillRect(paddleX, paddleY, paddleWidth, paddleHeight);
+
+      // Draw ball
       drawBall();
-      drawPaddle();
-      collisionDetection();
 
-      // Ball movement
-      ball.x += ball.dx;
-      ball.y += ball.dy;
-
-      if (ball.x + ball.dx > canvas.width - ball.radius || ball.x + ball.dx < ball.radius) {
-        ball.dx = -ball.dx;
+      // Draw blocks
+      for (let block of blocks) {
+        if (!block.hit) {
+          ctx.fillStyle = block.color;
+          ctx.fillRect(block.x, block.y, block.width, block.height);
+        }
       }
-      if (ball.y + ball.dy < ball.radius) {
-        ball.dy = -ball.dy;
-      } else if (ball.y + ball.dy > canvas.height - ball.radius) {
-        if (ball.x > paddle.x && ball.x < paddle.x + paddle.width) {
-          ball.dy = -ball.dy;
-        } else {
-          document.location.reload();
+    }
+
+    function updateBall() {
+      if (!ball.launched) return;
+
+      ball.x += ball.vx;
+      ball.y += ball.vy;
+
+      // Wall bounce
+      if (ball.x < ball.radius || ball.x > canvas.width - ball.radius) ball.vx *= -1;
+      if (ball.y < ball.radius) ball.vy *= -1;
+
+      // Paddle bounce
+      if (
+        ball.y + ball.radius >= paddleY &&
+        ball.x > paddleX &&
+        ball.x < paddleX + paddleWidth &&
+        ball.vy > 0
+      ) {
+        const hitPoint = (ball.x - paddleX) / paddleWidth - 0.5;
+        const angle = hitPoint * Math.PI / 3;
+        const speed = Math.sqrt(ball.vx ** 2 + ball.vy ** 2);
+        ball.vx = speed * Math.sin(angle);
+        ball.vy = -Math.abs(speed * Math.cos(angle));
+      }
+
+      // Block collision
+      for (let block of blocks) {
+        if (!block.hit &&
+          ball.x + ball.radius > block.x &&
+          ball.x - ball.radius < block.x + block.width &&
+          ball.y + ball.radius > block.y &&
+          ball.y - ball.radius < block.y + block.height
+        ) {
+          block.hit = true;
+          ball.vy *= -1;
+          xp += block.xp;
+          document.getElementById("xp").innerText = xp;
         }
       }
 
-      // Paddle movement
-      if (rightPressed && paddle.x < canvas.width - paddle.width) {
-        paddle.x += paddle.dx;
-      }
-      if (leftPressed && paddle.x > 0) {
-        paddle.x -= paddle.dx;
-      }
-
-      requestAnimationFrame(draw);
+      if (ball.y > canvas.height + ball.radius) resetBall();
     }
 
-    draw();
+    function resetBall() {
+      ball.x = canvas.width / 2;
+      ball.y = canvas.height - 60;
+      ball.vx = 2;
+      ball.vy = -4;
+      ball.launched = false;
+    }
+
+    function gameLoop() {
+      draw();
+      updateBall();
+      requestAnimationFrame(gameLoop);
+    }
+
+    document.addEventListener("keydown", e => {
+      if (e.key === "ArrowLeft") paddleX -= paddleSpeed * stats.speed;
+      if (e.key === "ArrowRight") paddleX += paddleSpeed * stats.speed;
+      if (e.key === " ") ball.launched = true;
+    });
+
+    gameLoop();
   </script>
 </body>
 </html>
-
-
